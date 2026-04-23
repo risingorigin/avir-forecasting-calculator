@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Avir Digital — Remodeling Ad Spend Forecaster</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121a2d;
+    --panel-2: #172242;
+    --line: #223056;
+    --ink: #e8ecf6;
+    --muted: #9aa6c2;
+    --brand: #d4af37;
+    --brand-2: #f2c94c;
+    --ok: #6ee7a7;
+    --warn: #ffb86b;
+    --bad: #ff7676;
+    --accent: #5ea1ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); }
+
+  header {
+    padding: 28px 32px;
+    background: linear-gradient(180deg, #0e1730 0%, #0b1220 100%);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: radial-gradient(120% 120% at 30% 20%, var(--brand-2), var(--brand) 60%, #8a6d1a 100%);
+    display: grid; place-items: center; color: #1a1200; font-weight: 800;
+    box-shadow: 0 4px 20px rgba(212,175,55,.25);
+  }
+  .brand { font-weight: 700; letter-spacing: .3px; }
+  .brand small { display: block; color: var(--muted); font-weight: 400; letter-spacing: .2px; }
+
+  main {
+    max-width: 1240px; margin: 0 auto; padding: 28px 24px 96px;
+    display: grid; gap: 24px;
+    grid-template-columns: 1.1fr 1fr;
+  }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 20px 18px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 16px; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+  .row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .row.one { grid-template-columns: 1fr; }
+  .row.three { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 640px) { .row, .row.three { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; background: #0c1428; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(212,175,55,.15); }
+
+  fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; margin: 0; background: var(--panel-2); }
+  legend { padding: 0 8px; color: var(--brand-2); font-weight: 600; font-size: 13px; }
+  .opts { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #0c1428; border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 12px;
+  }
+  .opt .name { font-size: 14px; }
+  .opt .price { font-size: 12px; color: var(--muted); }
+  .opt input[type="checkbox"], .opt input[type="radio"] { accent-color: var(--brand); transform: scale(1.1); }
+
+  .slider-group { display: grid; gap: 14px; }
+  .slider {
+    background: #0c1428; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  }
+  .slider .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .slider .head b { color: var(--ink); font-weight: 600; }
+  .slider .head span { color: var(--brand-2); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .slider input[type="range"] { width: 100%; accent-color: var(--brand); }
+  .slider small { color: var(--muted); }
+
+  .zips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: #0c1428; border: 1px solid var(--line); color: var(--ink);
+    padding: 4px 10px; border-radius: 999px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center;
+  }
+  .chip button { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; }
+  .chip button:hover { color: var(--bad); }
+
+  .results { display: grid; gap: 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .kpi {
+    background: #0c1428; border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+  }
+  .kpi .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .val { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi.big .val { font-size: 28px; color: var(--brand-2); }
+  .kpi.good .val { color: var(--ok); }
+  .kpi.warn .val { color: var(--warn); }
+  .kpi.bad  .val { color: var(--bad); }
+
+  table.funnel { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.funnel th, table.funnel td { padding: 9px 10px; border-bottom: 1px dashed var(--line); text-align: left; }
+  table.funnel th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  table.funnel td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .divider { height: 1px; background: var(--line); margin: 14px 0; }
+
+  button.primary {
+    background: linear-gradient(180deg, var(--brand-2), var(--brand));
+    color: #1a1200; border: 0; border-radius: 10px; padding: 10px 14px;
+    font-weight: 700; cursor: pointer;
+  }
+  button.ghost {
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; cursor: pointer;
+  }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .foot { color: var(--muted); font-size: 12px; text-align: center; padding: 0 24px 32px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">A</div>
+  <div class="brand">
+    Avir Digital
+    <small>Remodeling Ad Spend Forecaster</small>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: Inputs -->
+  <section class="card">
+    <h2>Campaign Inputs</h2>
+
+    <div class="row">
+      <div>
+        <label>Target sales (per month)</label>
+        <input type="number" id="targetSales" min="1" step="1" value="5" />
+      </div>
+      <div>
+        <label>Cost per appointment (ceiling)</label>
+        <input type="number" id="cpa" min="50" step="10" value="350" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="row one">
+      <div>
+        <label>ZIP codes (press Enter to add)</label>
+        <input type="text" id="zipInput" inputmode="numeric" pattern="\d{5}" placeholder="e.g. 33009" />
+        <div class="zips" id="zipList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div>
+        <label>Meta targeting radius (miles)</label>
+        <input type="number" id="radius" min="1" max="50" step="1" value="15" />
+      </div>
+      <div>
+        <label>Household filter</label>
+        <select id="household">
+          <option value="1.0">Homeowners, all incomes</option>
+          <option value="0.85" selected>Homeowners, $100k+ HHI</option>
+          <option value="0.65">Homeowners, $150k+ HHI</option>
+          <option value="0.45">Homeowners, $200k+ HHI</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="row">
+      <fieldset>
+        <legend>Kitchen scope</legend>
+        <div class="opts" id="kitchenOpts"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Bath scope</legend>
+        <div class="opts" id="bathOpts"></div>
+      </fieldset>
+    </div>
+
+    <fieldset style="margin-top:12px;">
+      <legend>Ancillary add-ons (multi-select)</legend>
+      <div class="opts" id="ancillaryOpts" style="grid-template-columns: 1fr 1fr;"></div>
+    </fieldset>
+
+    <div class="divider"></div>
+
+    <div class="slider-group">
+      <div class="slider">
+        <div class="head"><b>Appointments → Shows</b><span><span id="sShow">70</span>%</span></div>
+        <input type="range" id="rShow" min="30" max="95" step="1" value="70" />
+        <small>Industry benchmark for in-home remodeling: 65–75% of booked appointments actually happen.</small>
+      </div>
+      <div class="slider">
+        <div class="head"><b>Shows → Demos</b><span><span id="sDemo">80</span>%</span></div>
+        <input type="range" id="rDemo" min="40" max="100" step="1" value="80" />
+        <small>Benchmark: 75–85% of shown appointments convert to a full in-home design demo.</small>
+      </div>
+      <div class="slider">
+        <div class="head"><b>Demos → Sales</b><span><span id="sSale">33</span>%</span></div>
+        <input type="range" id="rSale" min="10" max="70" step="1" value="33" />
+        <small>Benchmark close rate: 30–40% for trained in-home remodeling reps.</small>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="actions">
+      <button class="ghost" id="resetBtn">Reset to defaults</button>
+    </div>
+  </section>
+
+  <!-- RIGHT: Results -->
+  <section class="card results">
+    <h2>Forecast</h2>
+
+    <div class="kpis">
+      <div class="kpi big">
+        <div class="lbl">Ad spend per sale</div>
+        <div class="val" id="kSpendPerSale">—</div>
+      </div>
+      <div class="kpi big">
+        <div class="lbl">Total ad spend (for target)</div>
+        <div class="val" id="kTotalSpend">—</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Avg. sale ticket</div>
+        <div class="val" id="kTicket">—</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Blended funnel conv. (appt→sale)</div>
+        <div class="val" id="kConv">—</div>
+      </div>
+      <div class="kpi good">
+        <div class="lbl">Gross revenue (target)</div>
+        <div class="val" id="kRevenue">—</div>
+      </div>
+      <div class="kpi" id="roasCard">
+        <div class="lbl">ROAS (revenue / ad spend)</div>
+        <div class="val" id="kRoas">—</div>
+      </div>
+    </div>
+
+    <div>
+      <h2 style="margin-bottom:8px;">Funnel to hit target</h2>
+      <table class="funnel">
+        <thead>
+          <tr><th>Stage</th><th>Rate</th><th class="num">Needed</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Appointments booked</td><td id="fAppRate">—</td><td class="num" id="fApp">—</td></tr>
+          <tr><td>Appointments shown</td><td id="fShowRate">—</td><td class="num" id="fShow">—</td></tr>
+          <tr><td>Demos completed</td><td id="fDemoRate">—</td><td class="num" id="fDemo">—</td></tr>
+          <tr><td><b>Sales closed</b></td><td id="fSaleRate">—</td><td class="num" id="fSale"><b>—</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2 style="margin-bottom:8px;">Meta targeting estimate</h2>
+      <table class="funnel">
+        <tbody>
+          <tr><td>ZIP codes targeted</td><td class="num" id="mZips">—</td></tr>
+          <tr><td>Radius per ZIP</td><td class="num" id="mRadius">—</td></tr>
+          <tr><td>Approx. coverage area</td><td class="num" id="mArea">—</td></tr>
+          <tr><td>Est. qualified audience</td><td class="num" id="mAudience">—</td></tr>
+          <tr><td>Audience saturation (at target spend)</td><td class="num" id="mSat">—</td></tr>
+        </tbody>
+      </table>
+      <p class="help" style="margin-top:8px;">
+        Audience is a rough estimate (~1,100 qualified homeowners / sq. mi. in US metro areas, adjusted by your HHI filter).
+        If saturation exceeds ~25% of the audience in a month, expand the radius or add ZIPs to avoid frequency fatigue.
+      </p>
+    </div>
+  </section>
+</main>
+
+<div class="foot">© Avir Digital — forecasts are directional estimates based on industry benchmarks; validate with live campaign data.</div>
+
+<script>
+/* ---------------- data ---------------- */
+
+const KITCHEN = [
+  { id: 'k-none', name: 'None',               price: 0 },
+  { id: 'k-refresh', name: 'Minor refresh',   price: 20000 },
+  { id: 'k-mid',  name: 'Mid-range remodel',  price: 42000 },
+  { id: 'k-major',name: 'Major / full gut',   price: 78000 },
+  { id: 'k-lux',  name: 'Luxury',             price: 135000 },
+];
+
+const BATH = [
+  { id: 'b-none', name: 'None',               price: 0 },
+  { id: 'b-refresh', name: 'Minor refresh',   price: 9500 },
+  { id: 'b-mid',  name: 'Mid-range remodel',  price: 22000 },
+  { id: 'b-major',name: 'Major / full gut',   price: 42000 },
+  { id: 'b-lux',  name: 'Luxury',             price: 78000 },
+];
+
+const ANCILLARY = [
+  { id: 'a-floor',   name: 'Flooring (LVP / tile)',       price: 5500 },
+  { id: 'a-counter', name: 'Countertops (quartz/stone)',  price: 4200 },
+  { id: 'a-cab',     name: 'Cabinet refacing',            price: 4800 },
+  { id: 'a-app',     name: 'Appliance package',           price: 8500 },
+  { id: 'a-light',   name: 'Lighting upgrade',            price: 2400 },
+  { id: 'a-plumb',   name: 'Plumbing fixtures',           price: 2100 },
+  { id: 'a-tile',    name: 'Backsplash / tile work',      price: 3200 },
+  { id: 'a-smart',   name: 'Smart-home integration',      price: 2600 },
+  { id: 'a-ada',     name: 'Accessibility / ADA',         price: 4000 },
+  { id: 'a-window',  name: 'Windows & doors',             price: 6800 },
+];
+
+const DEFAULTS = {
+  targetSales: 5,
+  cpa: 350,
+  radius: 15,
+  household: '0.85',
+  kitchen: 'k-mid',
+  bath:    'b-mid',
+  ancillary: ['a-counter', 'a-floor'],
+  show: 70, demo: 80, sale: 33,
+  zips: [],
+};
+
+/* ---------------- state ---------------- */
+
+const state = { ...structuredClone(DEFAULTS) };
+
+/* ---------------- render ---------------- */
+
+function fmtMoney(n) {
+  if (!isFinite(n) || n === 0) return '$0';
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(2) + 'M';
+  if (n >= 10000)   return '$' + Math.round(n/1000).toLocaleString() + 'k';
+  return '$' + Math.round(n).toLocaleString();
+}
+function fmtInt(n) { return Math.round(n).toLocaleString(); }
+function fmtPct(n) { return (n*100).toFixed(1) + '%'; }
+
+function renderScopeGroup(containerId, items, selectedId, onChange, groupName) {
+  const box = document.getElementById(containerId);
+  box.innerHTML = '';
+  items.forEach(it => {
+    const row = document.createElement('label');
+    row.className = 'opt';
+    row.innerHTML = `
+      <span class="name"><input type="radio" name="${groupName}" value="${it.id}" ${it.id===selectedId?'checked':''} /> ${it.name}</span>
+      <span class="price">${it.price ? '+'+fmtMoney(it.price) : '—'}</span>
+    `;
+    row.querySelector('input').addEventListener('change', e => { onChange(e.target.value); compute(); });
+    box.appendChild(row);
+  });
+}
+
+function renderAncillary() {
+  const box = document.getElementById('ancillaryOpts');
+  box.innerHTML = '';
+  ANCILLARY.forEach(it => {
+    const row = document.createElement('label');
+    row.className = 'opt';
+    row.innerHTML = `
+      <span class="name"><input type="checkbox" value="${it.id}" ${state.ancillary.includes(it.id)?'checked':''}/> ${it.name}</span>
+      <span class="price">+${fmtMoney(it.price)}</span>
+    `;
+    row.querySelector('input').addEventListener('change', e => {
+      const v = e.target.value;
+      if (e.target.checked) { if (!state.ancillary.includes(v)) state.ancillary.push(v); }
+      else state.ancillary = state.ancillary.filter(x => x !== v);
+      compute();
+    });
+    box.appendChild(row);
+  });
+}
+
+function renderZips() {
+  const box = document.getElementById('zipList');
+  box.innerHTML = '';
+  state.zips.forEach(z => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `${z} <button title="remove">×</button>`;
+    chip.querySelector('button').addEventListener('click', () => {
+      state.zips = state.zips.filter(x => x !== z);
+      renderZips(); compute();
+    });
+    box.appendChild(chip);
+  });
+}
+
+/* ---------------- compute ---------------- */
+
+function compute() {
+  // ticket size
+  const k = KITCHEN.find(x => x.id === state.kitchen)?.price ?? 0;
+  const b = BATH.find(x => x.id === state.bath)?.price ?? 0;
+  const a = ANCILLARY.filter(x => state.ancillary.includes(x.id)).reduce((s,x) => s+x.price, 0);
+  const ticket = k + b + a;
+
+  // funnel rates
+  const rShow = state.show/100, rDemo = state.demo/100, rSale = state.sale/100;
+  const blended = rShow * rDemo * rSale; // appointments -> sales
+
+  // appointments needed per sale
+  const apptPerSale = blended > 0 ? 1/blended : Infinity;
+  const spendPerSale = apptPerSale * state.cpa;
+
+  // totals for target
+  const target = Math.max(1, Number(state.targetSales) || 1);
+  const totalAppts   = apptPerSale * target;
+  const totalShows   = totalAppts * rShow;
+  const totalDemos   = totalShows * rDemo;
+  const totalSales   = totalDemos * rSale;
+  const totalSpend   = totalAppts * state.cpa;
+  const totalRevenue = target * ticket;
+  const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+
+  // meta audience (very rough)
+  const zips = Math.max(1, state.zips.length);
+  const areaPerZip = Math.PI * state.radius * state.radius;
+  // radius zones around multiple ZIPs tend to overlap; discount by a sqrt factor.
+  const totalArea = areaPerZip * Math.sqrt(zips);
+  const baseDensity = 1100; // qualified homeowners per sq mi (US metro avg)
+  const hhi = Number(state.household) || 1;
+  const audience = Math.round(totalArea * baseDensity * hhi);
+  const impressionsTotal = (totalSpend / 8) * 1000; // assume ~$8 CPM on Meta
+  const reach = Math.min(audience, impressionsTotal / 3); // assume freq ~3
+  const saturation = audience > 0 ? reach / audience : 0;
+
+  // write DOM
+  document.getElementById('kTicket').textContent     = fmtMoney(ticket);
+  document.getElementById('kSpendPerSale').textContent = isFinite(spendPerSale) ? fmtMoney(spendPerSale) : '—';
+  document.getElementById('kTotalSpend').textContent  = isFinite(totalSpend) ? fmtMoney(totalSpend) : '—';
+  document.getElementById('kConv').textContent        = fmtPct(blended);
+  document.getElementById('kRevenue').textContent     = fmtMoney(totalRevenue);
+
+  const roasEl = document.getElementById('kRoas');
+  const roasCard = document.getElementById('roasCard');
+  roasEl.textContent = roas ? roas.toFixed(2) + '×' : '—';
+  roasCard.classList.remove('good','warn','bad');
+  if (roas >= 8) roasCard.classList.add('good');
+  else if (roas >= 4) roasCard.classList.add('warn');
+  else roasCard.classList.add('bad');
+
+  document.getElementById('fAppRate').textContent  = '100%';
+  document.getElementById('fShowRate').textContent = state.show + '%';
+  document.getElementById('fDemoRate').textContent = state.demo + '%';
+  document.getElementById('fSaleRate').textContent = state.sale + '%';
+  document.getElementById('fApp').textContent  = isFinite(totalAppts) ? fmtInt(totalAppts) : '—';
+  document.getElementById('fShow').textContent = isFinite(totalShows) ? fmtInt(totalShows) : '—';
+  document.getElementById('fDemo').textContent = isFinite(totalDemos) ? fmtInt(totalDemos) : '—';
+  document.getElementById('fSale').innerHTML   = '<b>' + fmtInt(totalSales) + '</b>';
+
+  document.getElementById('mZips').textContent    = state.zips.length ? state.zips.length : '1 (none entered)';
+  document.getElementById('mRadius').textContent  = state.radius + ' mi';
+  document.getElementById('mArea').textContent    = fmtInt(totalArea) + ' sq mi';
+  document.getElementById('mAudience').textContent= fmtInt(audience);
+  document.getElementById('mSat').textContent     = fmtPct(saturation);
+}
+
+/* ---------------- wiring ---------------- */
+
+function wireInputs() {
+  document.getElementById('targetSales').addEventListener('input', e => { state.targetSales = Number(e.target.value)||1; compute(); });
+  document.getElementById('cpa').addEventListener('input', e => { state.cpa = Number(e.target.value)||0; compute(); });
+  document.getElementById('radius').addEventListener('input', e => { state.radius = Math.min(50, Math.max(1, Number(e.target.value)||1)); compute(); });
+  document.getElementById('household').addEventListener('change', e => { state.household = e.target.value; compute(); });
+
+  const zipInput = document.getElementById('zipInput');
+  zipInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const v = zipInput.value.trim();
+      if (/^\d{5}$/.test(v) && !state.zips.includes(v)) {
+        state.zips.push(v);
+        renderZips(); compute();
+      }
+      zipInput.value = '';
+    }
+  });
+
+  const bind = (range, out, key) => {
+    const r = document.getElementById(range), o = document.getElementById(out);
+    r.addEventListener('input', () => { state[key] = Number(r.value); o.textContent = r.value; compute(); });
+  };
+  bind('rShow', 'sShow', 'show');
+  bind('rDemo', 'sDemo', 'demo');
+  bind('rSale', 'sSale', 'sale');
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.assign(state, structuredClone(DEFAULTS));
+    document.getElementById('targetSales').value = state.targetSales;
+    document.getElementById('cpa').value = state.cpa;
+    document.getElementById('radius').value = state.radius;
+    document.getElementById('household').value = state.household;
+    document.getElementById('rShow').value = state.show;  document.getElementById('sShow').textContent = state.show;
+    document.getElementById('rDemo').value = state.demo;  document.getElementById('sDemo').textContent = state.demo;
+    document.getElementById('rSale').value = state.sale;  document.getElementById('sSale').textContent = state.sale;
+    renderScopeGroup('kitchenOpts', KITCHEN, state.kitchen, v => state.kitchen = v, 'kitchen');
+    renderScopeGroup('bathOpts',    BATH,    state.bath,    v => state.bath = v,    'bath');
+    renderAncillary();
+    renderZips();
+    compute();
+  });
+}
+
+/* ---------------- init ---------------- */
+
+renderScopeGroup('kitchenOpts', KITCHEN, state.kitchen, v => state.kitchen = v, 'kitchen');
+renderScopeGroup('bathOpts',    BATH,    state.bath,    v => state.bath = v,    'bath');
+renderAncillary();
+renderZips();
+wireInputs();
+compute();
+</script>
+</body>
+</html>
