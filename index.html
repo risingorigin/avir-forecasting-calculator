@@ -73,9 +73,40 @@
     background: #0c1428; border: 1px solid var(--line); border-radius: 10px;
     padding: 9px 12px;
   }
-  .opt .name { font-size: 14px; }
+  .opt .name { font-size: 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   .opt .price { font-size: 12px; color: var(--muted); }
   .opt input[type="checkbox"], .opt input[type="radio"] { accent-color: var(--brand); transform: scale(1.1); }
+
+  .price-edit { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 2px; }
+  .priceInput {
+    width: 86px; background: transparent; color: var(--brand-2);
+    border: 1px dashed var(--line); border-radius: 6px;
+    padding: 3px 6px; font-size: 13px; text-align: right;
+    font-variant-numeric: tabular-nums; outline: none;
+  }
+  .priceInput:focus { border-color: var(--brand); border-style: solid; }
+  .priceInput.overridden { border-color: var(--brand); border-style: solid; color: var(--brand); }
+
+  .custom-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
+  .custom-row .customName {
+    background: transparent; color: var(--ink);
+    border: 1px dashed var(--line); border-radius: 6px;
+    padding: 5px 8px; font-size: 13px; outline: none;
+  }
+  .custom-row .customName:focus { border-color: var(--brand); border-style: solid; }
+  .custom-row .rm {
+    background: transparent; border: 1px solid var(--line);
+    color: var(--muted); cursor: pointer; border-radius: 6px;
+    width: 26px; height: 26px; line-height: 1; padding: 0; font-size: 14px;
+  }
+  .custom-row .rm:hover { color: var(--bad); border-color: var(--bad); }
+  .add-custom-btn {
+    background: transparent; border: 1px dashed var(--line);
+    color: var(--brand-2); border-radius: 8px; padding: 8px 12px;
+    cursor: pointer; font-size: 13px; width: 100%;
+  }
+  .add-custom-btn:hover { border-color: var(--brand); border-style: solid; }
+  .empty-hint { color: var(--muted); font-size: 12px; padding: 4px 2px 8px; }
 
   .slider-group { display: grid; gap: 14px; }
   .slider {
@@ -197,6 +228,16 @@
     <fieldset style="margin-top:12px;">
       <legend>Ancillary add-ons (multi-select)</legend>
       <div class="opts" id="ancillaryOpts" style="grid-template-columns: 1fr 1fr;"></div>
+    </fieldset>
+
+    <p class="help" style="margin:10px 2px 0;">
+      Tip: tap any price to override it. Empty = use default. Add custom line items below for one-off services.
+    </p>
+
+    <fieldset style="margin-top:12px;">
+      <legend>Custom line items</legend>
+      <div id="customList"></div>
+      <button class="add-custom-btn" id="addCustomBtn" style="margin-top:8px;">+ Add custom line item</button>
     </fieldset>
 
     <div class="divider"></div>
@@ -335,7 +376,11 @@ const DEFAULTS = {
   ancillary: ['a-counter', 'a-floor'],
   show: 70, demo: 80, sale: 33,
   zips: [],
+  overrides: {}, // { itemId: number } per-line price override
+  custom: [],    // [{ id, name, price, on }] user-defined line items
 };
+
+let customSeq = 1;
 
 /* ---------------- state ---------------- */
 
@@ -351,18 +396,55 @@ function fmtMoney(n) {
 }
 function fmtInt(n) { return Math.round(n).toLocaleString(); }
 function fmtPct(n) { return (n*100).toFixed(1) + '%'; }
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function effectivePrice(itemId, defaultPrice) {
+  const o = state.overrides[itemId];
+  return (o == null || !isFinite(o)) ? defaultPrice : o;
+}
+
+function bindPriceInput(rowEl, itemId, defaultPrice) {
+  const input = rowEl.querySelector('.priceInput');
+  if (!input) return;
+  const sync = () => {
+    const has = state.overrides[itemId] != null;
+    input.classList.toggle('overridden', has);
+  };
+  sync();
+  input.addEventListener('input', () => {
+    const v = input.value.trim();
+    if (v === '') delete state.overrides[itemId];
+    else state.overrides[itemId] = Math.max(0, Number(v) || 0);
+    sync();
+    compute();
+  });
+  // prevent the surrounding row label from toggling the radio/checkbox
+  input.addEventListener('click', e => e.stopPropagation());
+}
+
+function priceCellHTML(itemId, defaultPrice, prefix) {
+  if (defaultPrice === 0 && state.overrides[itemId] == null) {
+    return `<span class="price">—</span>`;
+  }
+  const ov = state.overrides[itemId];
+  const value = ov != null ? ov : '';
+  return `<span class="price-edit">${prefix}$<input type="number" min="0" step="100"
+            class="priceInput" value="${value}" placeholder="${defaultPrice}" /></span>`;
+}
 
 function renderScopeGroup(containerId, items, selectedId, onChange, groupName) {
   const box = document.getElementById(containerId);
   box.innerHTML = '';
   items.forEach(it => {
-    const row = document.createElement('label');
+    const row = document.createElement('div');
     row.className = 'opt';
     row.innerHTML = `
-      <span class="name"><input type="radio" name="${groupName}" value="${it.id}" ${it.id===selectedId?'checked':''} /> ${it.name}</span>
-      <span class="price">${it.price ? '+'+fmtMoney(it.price) : '—'}</span>
+      <label class="name"><input type="radio" name="${groupName}" value="${it.id}" ${it.id===selectedId?'checked':''} />${it.name}</label>
+      ${priceCellHTML(it.id, it.price, '+')}
     `;
-    row.querySelector('input').addEventListener('change', e => { onChange(e.target.value); compute(); });
+    row.querySelector('input[type="radio"]').addEventListener('change', e => { onChange(e.target.value); compute(); });
+    bindPriceInput(row, it.id, it.price);
     box.appendChild(row);
   });
 }
@@ -371,20 +453,67 @@ function renderAncillary() {
   const box = document.getElementById('ancillaryOpts');
   box.innerHTML = '';
   ANCILLARY.forEach(it => {
-    const row = document.createElement('label');
+    const row = document.createElement('div');
     row.className = 'opt';
     row.innerHTML = `
-      <span class="name"><input type="checkbox" value="${it.id}" ${state.ancillary.includes(it.id)?'checked':''}/> ${it.name}</span>
-      <span class="price">+${fmtMoney(it.price)}</span>
+      <label class="name"><input type="checkbox" value="${it.id}" ${state.ancillary.includes(it.id)?'checked':''}/>${it.name}</label>
+      ${priceCellHTML(it.id, it.price, '+')}
     `;
-    row.querySelector('input').addEventListener('change', e => {
+    row.querySelector('input[type="checkbox"]').addEventListener('change', e => {
       const v = e.target.value;
       if (e.target.checked) { if (!state.ancillary.includes(v)) state.ancillary.push(v); }
       else state.ancillary = state.ancillary.filter(x => x !== v);
       compute();
     });
+    bindPriceInput(row, it.id, it.price);
     box.appendChild(row);
   });
+}
+
+function renderCustom() {
+  const box = document.getElementById('customList');
+  box.innerHTML = '';
+  if (state.custom.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = 'No custom line items yet.';
+    box.appendChild(hint);
+    return;
+  }
+  state.custom.forEach((c, idx) => {
+    const row = document.createElement('div');
+    row.className = 'opt custom-row';
+    row.innerHTML = `
+      <label class="name"><input type="checkbox" ${c.on?'checked':''} /></label>
+      <input type="text" class="customName" placeholder="Service name (e.g. Demolition)" value="${escapeHtml(c.name)}" />
+      <span class="price-edit">+$<input type="number" min="0" step="100" class="priceInput customPrice" value="${c.price ?? ''}" placeholder="0" /></span>
+      <button class="rm" title="remove" aria-label="remove">×</button>
+    `;
+    const chk    = row.querySelector('input[type="checkbox"]');
+    const nameI  = row.querySelector('.customName');
+    const priceI = row.querySelector('.customPrice');
+    const rm     = row.querySelector('.rm');
+    chk.addEventListener('change', () => { state.custom[idx].on = chk.checked; compute(); });
+    nameI.addEventListener('input', () => { state.custom[idx].name = nameI.value; });
+    priceI.addEventListener('input', () => {
+      const v = priceI.value.trim();
+      state.custom[idx].price = v === '' ? 0 : Math.max(0, Number(v) || 0);
+      compute();
+    });
+    priceI.addEventListener('click', e => e.stopPropagation());
+    rm.addEventListener('click', () => { state.custom.splice(idx, 1); renderCustom(); compute(); });
+    box.appendChild(row);
+  });
+}
+
+function addCustomLine() {
+  state.custom.push({ id: 'c-' + (customSeq++), name: '', price: 0, on: true });
+  renderCustom();
+  compute();
+  // focus the new name input
+  const list = document.getElementById('customList');
+  const inputs = list.querySelectorAll('.customName');
+  if (inputs.length) inputs[inputs.length - 1].focus();
 }
 
 function renderZips() {
@@ -405,11 +534,18 @@ function renderZips() {
 /* ---------------- compute ---------------- */
 
 function compute() {
-  // ticket size
-  const k = KITCHEN.find(x => x.id === state.kitchen)?.price ?? 0;
-  const b = BATH.find(x => x.id === state.bath)?.price ?? 0;
-  const a = ANCILLARY.filter(x => state.ancillary.includes(x.id)).reduce((s,x) => s+x.price, 0);
-  const ticket = k + b + a;
+  // ticket size (with per-line overrides + custom line items)
+  const kItem = KITCHEN.find(x => x.id === state.kitchen);
+  const bItem = BATH.find(x => x.id === state.bath);
+  const k = kItem ? effectivePrice(kItem.id, kItem.price) : 0;
+  const b = bItem ? effectivePrice(bItem.id, bItem.price) : 0;
+  const a = ANCILLARY
+    .filter(x => state.ancillary.includes(x.id))
+    .reduce((s,x) => s + effectivePrice(x.id, x.price), 0);
+  const cu = state.custom
+    .filter(x => x.on)
+    .reduce((s,x) => s + (Number(x.price) || 0), 0);
+  const ticket = k + b + a + cu;
 
   // funnel rates
   const rShow = state.show/100, rDemo = state.demo/100, rSale = state.sale/100;
@@ -501,6 +637,8 @@ function wireInputs() {
   bind('rDemo', 'sDemo', 'demo');
   bind('rSale', 'sSale', 'sale');
 
+  document.getElementById('addCustomBtn').addEventListener('click', addCustomLine);
+
   document.getElementById('resetBtn').addEventListener('click', () => {
     Object.assign(state, structuredClone(DEFAULTS));
     document.getElementById('targetSales').value = state.targetSales;
@@ -513,6 +651,7 @@ function wireInputs() {
     renderScopeGroup('kitchenOpts', KITCHEN, state.kitchen, v => state.kitchen = v, 'kitchen');
     renderScopeGroup('bathOpts',    BATH,    state.bath,    v => state.bath = v,    'bath');
     renderAncillary();
+    renderCustom();
     renderZips();
     compute();
   });
@@ -523,6 +662,7 @@ function wireInputs() {
 renderScopeGroup('kitchenOpts', KITCHEN, state.kitchen, v => state.kitchen = v, 'kitchen');
 renderScopeGroup('bathOpts',    BATH,    state.bath,    v => state.bath = v,    'bath');
 renderAncillary();
+renderCustom();
 renderZips();
 wireInputs();
 compute();
